@@ -138,8 +138,8 @@ def generar_boleta_optimizada(monto_objetivo, tolerancia=5):
                 else:
                     break
 
-    # Verificar si encontramos una solución válida
-    if monto_min <= total <= monto_max:
+    # Verificar si encontramos una solución válida (mínimo 3 productos diferentes)
+    if monto_min <= total <= monto_max and len(solucion) >= 3:
         diferencia = abs(total - monto_objetivo)
         if diferencia < mejor_diferencia:
             mejor_diferencia = diferencia
@@ -177,7 +177,7 @@ def generar_boleta_optimizada(monto_objetivo, tolerancia=5):
                     else:
                         break
 
-        if monto_min <= total <= monto_max:
+        if monto_min <= total <= monto_max and len(solucion) >= 3:
             diferencia = abs(total - monto_objetivo)
             if diferencia < mejor_diferencia:
                 mejor_diferencia = diferencia
@@ -187,7 +187,7 @@ def generar_boleta_optimizada(monto_objetivo, tolerancia=5):
         return {
             'productos': [],
             'total': 0,
-            'error': f'No se encontró combinación válida para el monto ${monto_objetivo} (±${tolerancia})'
+            'error': f'No se encontró combinación válida para el monto ${monto_objetivo} (±${tolerancia}). Se requieren mínimo 3 productos diferentes.'
         }
 
     # Construir respuesta
