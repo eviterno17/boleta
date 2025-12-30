@@ -70,7 +70,7 @@ class Boleta(db.Model):
 def generar_boleta_optimizada(monto_objetivo, tolerancia=5):
     """
     Genera una boleta óptima de manera RÁPIDA usando enfoque greedy.
-    Complejidad: O(n log n) - Mucho más rápido que backtracking
+    REQUIERE MÍNIMO 3 PRODUCTOS DIFERENTES
 
     Args:
         monto_objetivo (float): Monto objetivo a alcanzar
@@ -83,6 +83,9 @@ def generar_boleta_optimizada(monto_objetivo, tolerancia=5):
 
     if not productos:
         return {'productos': [], 'total': 0, 'error': 'No hay productos disponibles'}
+
+    if len(productos) < 3:
+        return {'productos': [], 'total': 0, 'error': 'Se requieren al menos 3 productos diferentes en inventario'}
 
     monto_min = monto_objetivo - tolerancia
     monto_max = monto_objetivo + tolerancia
@@ -99,89 +102,126 @@ def generar_boleta_optimizada(monto_objetivo, tolerancia=5):
             'stock': p.stock
         })
 
-    # Ordenar por precio (de menor a mayor) para enfoque greedy
+    # Ordenar por precio (de menor a mayor)
     items.sort(key=lambda x: x['precio'])
 
     mejor_solucion = None
     mejor_diferencia = float('inf')
 
-    # Estrategia 1: Buscar desde productos baratos hacia caros
+    # Estrategia 1: Agregar PRIMERO 3 productos con cantidad mínima, luego optimizar
     solucion = {}
     total = 0.0
 
+    # Paso 1: Agregar los primeros 3 productos más baratos con cantidad mínima
+    productos_agregados = 0
     for item in items:
-        if total >= monto_max:
+        if productos_agregados >= 3:
             break
 
         precio = item['precio']
         cantidad_min = item['cantidad_min']
-        stock = item['stock']
         producto = item['producto']
 
-        # Calcular cuántas unidades podemos agregar
-        espacio_restante = monto_max - total
-        max_unidades = min(int(espacio_restante / precio), stock)
+        # Verificar que podemos agregar al menos la cantidad mínima
+        costo_minimo = precio * cantidad_min
+        if total + costo_minimo <= monto_max and cantidad_min <= item['stock']:
+            solucion[producto.id] = {'producto': producto, 'cantidad': cantidad_min}
+            total += costo_minimo
+            productos_agregados += 1
 
-        if max_unidades >= cantidad_min:
-            # Agregar cantidad óptima
-            cantidad = max_unidades
+    # Paso 2: Si tenemos 3 productos, intentar completar hasta el monto objetivo
+    if len(solucion) >= 3:
+        # Intentar agregar más cantidad a los productos existentes
+        for prod_id in list(solucion.keys()):
+            item_data = solucion[prod_id]
+            producto = item_data['producto']
+            cantidad_actual = item_data['cantidad']
 
-            # Ajustar para acercarse al objetivo
-            while cantidad >= cantidad_min:
-                nuevo_total = total + (precio * cantidad)
-                if monto_min <= nuevo_total <= monto_max:
-                    solucion[producto.id] = {'producto': producto, 'cantidad': cantidad}
-                    total = nuevo_total
-                    break
-                elif nuevo_total > monto_max:
-                    cantidad -= 1
-                else:
-                    break
+            # Encontrar el item original
+            item_original = next((i for i in items if i['producto'].id == prod_id), None)
+            if not item_original:
+                continue
 
-    # Verificar si encontramos una solución válida (mínimo 3 productos diferentes)
-    if monto_min <= total <= monto_max and len(solucion) >= 3:
-        diferencia = abs(total - monto_objetivo)
-        if diferencia < mejor_diferencia:
+            precio = item_original['precio']
+            stock = item_original['stock']
+
+            # Calcular cuántas unidades más podemos agregar
+            espacio_restante = monto_max - total
+            unidades_adicionales = min(int(espacio_restante / precio), stock - cantidad_actual)
+
+            if unidades_adicionales > 0:
+                # Agregar de a una hasta acercarnos al objetivo
+                for extra in range(1, unidades_adicionales + 1):
+                    nuevo_total = total + (precio * extra)
+                    if monto_min <= nuevo_total <= monto_max:
+                        solucion[prod_id]['cantidad'] += extra
+                        total = nuevo_total
+                        break
+
+            # Si ya estamos en rango, salir
+            if monto_min <= total <= monto_max:
+                break
+
+        # Validar solución
+        if monto_min <= total <= monto_max:
+            diferencia = abs(total - monto_objetivo)
             mejor_diferencia = diferencia
             mejor_solucion = solucion
 
-    # Estrategia 2: Si no encontramos solución, intentar desde productos caros
+    # Estrategia 2: Si no funcionó, intentar con productos más caros
     if mejor_solucion is None:
-        items.reverse()  # Ordenar de caro a barato
+        items.reverse()  # De caro a barato
         solucion = {}
         total = 0.0
 
+        # Agregar primeros 3 productos más caros con cantidad mínima
+        productos_agregados = 0
         for item in items:
-            if total >= monto_max:
+            if productos_agregados >= 3:
                 break
 
             precio = item['precio']
             cantidad_min = item['cantidad_min']
-            stock = item['stock']
             producto = item['producto']
 
-            espacio_restante = monto_max - total
-            max_unidades = min(int(espacio_restante / precio), stock)
+            costo_minimo = precio * cantidad_min
+            if total + costo_minimo <= monto_max and cantidad_min <= item['stock']:
+                solucion[producto.id] = {'producto': producto, 'cantidad': cantidad_min}
+                total += costo_minimo
+                productos_agregados += 1
 
-            if max_unidades >= cantidad_min:
-                cantidad = cantidad_min  # Empezar con el mínimo
+        # Completar hasta el monto
+        if len(solucion) >= 3:
+            for prod_id in list(solucion.keys()):
+                item_data = solucion[prod_id]
+                producto = item_data['producto']
+                cantidad_actual = item_data['cantidad']
 
-                while cantidad <= max_unidades:
-                    nuevo_total = total + (precio * cantidad)
-                    if monto_min <= nuevo_total <= monto_max:
-                        solucion[producto.id] = {'producto': producto, 'cantidad': cantidad}
-                        total = nuevo_total
-                        break
-                    elif nuevo_total < monto_min:
-                        cantidad += 1
-                    else:
-                        break
+                item_original = next((i for i in items if i['producto'].id == prod_id), None)
+                if not item_original:
+                    continue
 
-        if monto_min <= total <= monto_max and len(solucion) >= 3:
-            diferencia = abs(total - monto_objetivo)
-            if diferencia < mejor_diferencia:
-                mejor_diferencia = diferencia
-                mejor_solucion = solucion
+                precio = item_original['precio']
+                stock = item_original['stock']
+                espacio_restante = monto_max - total
+                unidades_adicionales = min(int(espacio_restante / precio), stock - cantidad_actual)
+
+                if unidades_adicionales > 0:
+                    for extra in range(1, unidades_adicionales + 1):
+                        nuevo_total = total + (precio * extra)
+                        if monto_min <= nuevo_total <= monto_max:
+                            solucion[prod_id]['cantidad'] += extra
+                            total = nuevo_total
+                            break
+
+                if monto_min <= total <= monto_max:
+                    break
+
+            if monto_min <= total <= monto_max:
+                diferencia = abs(total - monto_objetivo)
+                if diferencia < mejor_diferencia:
+                    mejor_diferencia = diferencia
+                    mejor_solucion = solucion
 
     if mejor_solucion is None:
         return {
