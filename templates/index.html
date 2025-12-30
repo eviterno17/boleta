@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestión de Boletas</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Sistema de Gestión de Boletas</h1>
+            <p>Gestiona productos y genera boletas automáticamente</p>
+        </header>
+
+        <!-- Sección: Agregar Producto -->
+        <section class="card">
+            <h2>Agregar Producto</h2>
+            <form id="form-producto">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="nombre">Nombre del Producto *</label>
+                        <input type="text" id="nombre" name="nombre" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="precio_unitario">Precio Unitario *</label>
+                        <input type="number" id="precio_unitario" name="precio_unitario" step="0.01" min="0" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="stock">Stock</label>
+                        <input type="number" id="stock" name="stock" min="0" value="0">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group checkbox-group">
+                        <label>
+                            <input type="checkbox" id="tiene_despacho_minimo" name="tiene_despacho_minimo">
+                            Tiene despacho mínimo
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cantidad_minima_despacho">Cantidad Mínima de Despacho</label>
+                        <input type="number" id="cantidad_minima_despacho" name="cantidad_minima_despacho" min="1" disabled>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Agregar Producto</button>
+            </form>
+        </section>
+
+        <!-- Sección: Lista de Productos -->
+        <section class="card">
+            <h2>Lista de Productos</h2>
+            <div id="mensaje-productos" class="mensaje"></div>
+            <div class="table-container">
+                <table id="tabla-productos">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nombre</th>
+                            <th>Precio Unitario</th>
+                            <th>Stock</th>
+                            <th>Despacho Mínimo</th>
+                            <th>Cantidad Mínima</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Se llenará dinámicamente -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Sección: Generar Boleta -->
+        <section class="card">
+            <h2>Generar Boleta</h2>
+            <form id="form-boleta">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="monto_objetivo">Monto Objetivo *</label>
+                        <input type="number" id="monto_objetivo" name="monto_objetivo" step="0.01" min="0" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="tolerancia">Tolerancia (±)</label>
+                        <input type="number" id="tolerancia" name="tolerancia" step="0.01" min="0" value="5">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-success">Generar Boleta</button>
+            </form>
+
+            <div id="resultado-boleta" class="boleta-resultado" style="display: none;">
+                <h3>Boleta Generada</h3>
+                <div id="info-boleta"></div>
+                <div class="table-container">
+                    <table id="tabla-boleta">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Precio Unitario</th>
+                                <th>Cantidad</th>
+                                <th>Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Se llenará dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="total-boleta">
+                    <strong>Total: $<span id="total-boleta">0.00</span></strong>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
