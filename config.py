@@ -6,12 +6,15 @@ class Config:
     # Configuración de MySQL
     MYSQL_HOST = 'localhost'
     MYSQL_USER = 'root'
-    MYSQL_PASSWORD = ''  # Cambiar si tienes contraseña
+    MYSQL_PASSWORD = '#Celular0523'  # Cambiar si tienes contraseña
     MYSQL_DB = 'boletas_db'
 
-    # Configuración de SQLAlchemy
-    SQLALCHEMY_DATABASE_URI = f'mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}/{MYSQL_DB}'
+    # Configuración de SQLAlchemy (construida después de definir las variables)
+    SQLALCHEMY_DATABASE_URI = None
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # Configuración de Flask
-    SECRET_KEY = 'tu_clave_secreta_aqui'  # Cambiar en producción
+    SECRET_KEY = 'clave-local-desarrollo-123'  # Para uso local está bien cualquier string
+
+# Construir la URI después de definir la clase
+Config.SQLALCHEMY_DATABASE_URI = f'mysql+pymysql://{Config.MYSQL_USER}:{Config.MYSQL_PASSWORD}@{Config.MYSQL_HOST}/{Config.MYSQL_DB}'
