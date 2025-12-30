@@ -14,6 +14,21 @@ CREATE TABLE IF NOT EXISTS productos (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+-- Crear tabla de boletas
+CREATE TABLE IF NOT EXISTS boletas (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nombre_cliente VARCHAR(255) NOT NULL,
+    dni_cliente VARCHAR(50) NOT NULL,
+    lugar_cliente VARCHAR(255) NOT NULL,
+    monto_objetivo DECIMAL(10, 2) NOT NULL,
+    total DECIMAL(10, 2) NOT NULL,
+    diferencia DECIMAL(10, 2) NOT NULL,
+    productos_json TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_cliente (dni_cliente),
+    INDEX idx_fecha (created_at)
+);
+
 -- Insertar algunos productos de ejemplo
 INSERT INTO productos (nombre, precio_unitario, stock, tiene_despacho_minimo, cantidad_minima_despacho) VALUES
 ('Arroz 1kg', 1500.00, 100, TRUE, 5),

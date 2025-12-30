@@ -37,11 +37,40 @@ class Producto(db.Model):
         }
 
 
-# Algoritmo de generación de boleta (problema de la mochila)
+# Modelo de Boleta
+class Boleta(db.Model):
+    __tablename__ = 'boletas'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nombre_cliente = db.Column(db.String(255), nullable=False)
+    dni_cliente = db.Column(db.String(50), nullable=False)
+    lugar_cliente = db.Column(db.String(255), nullable=False)
+    monto_objetivo = db.Column(db.Numeric(10, 2), nullable=False)
+    total = db.Column(db.Numeric(10, 2), nullable=False)
+    diferencia = db.Column(db.Numeric(10, 2), nullable=False)
+    productos_json = db.Column(db.Text, nullable=False)  # JSON con productos
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+    def to_dict(self):
+        import json
+        return {
+            'id': self.id,
+            'nombre_cliente': self.nombre_cliente,
+            'dni_cliente': self.dni_cliente,
+            'lugar_cliente': self.lugar_cliente,
+            'monto_objetivo': float(self.monto_objetivo),
+            'total': float(self.total),
+            'diferencia': float(self.diferencia),
+            'productos': json.loads(self.productos_json),
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+
+# Algoritmo RÁPIDO de generación de boleta (enfoque greedy optimizado)
 def generar_boleta_optimizada(monto_objetivo, tolerancia=5):
     """
-    Genera una boleta óptima basada en el monto objetivo con tolerancia de ±5.
-    Usa programación dinámica con restricciones de despacho mínimo.
+    Genera una boleta óptima de manera RÁPIDA usando enfoque greedy.
+    Complejidad: O(n log n) - Mucho más rápido que backtracking
 
     Args:
         monto_objetivo (float): Monto objetivo a alcanzar
@@ -58,62 +87,101 @@ def generar_boleta_optimizada(monto_objetivo, tolerancia=5):
     monto_min = monto_objetivo - tolerancia
     monto_max = monto_objetivo + tolerancia
 
-    # Convertir a enteros para trabajar con centavos (evitar problemas de punto flotante)
-    monto_min_cents = int(monto_min * 100)
-    monto_max_cents = int(monto_max * 100)
-    monto_objetivo_cents = int(monto_objetivo * 100)
+    # Preparar productos para el algoritmo
+    items = []
+    for p in productos:
+        precio = float(p.precio_unitario)
+        cantidad_min = p.cantidad_minima_despacho if (p.tiene_despacho_minimo and p.cantidad_minima_despacho) else 1
+        items.append({
+            'producto': p,
+            'precio': precio,
+            'cantidad_min': cantidad_min,
+            'stock': p.stock
+        })
+
+    # Ordenar por precio (de menor a mayor) para enfoque greedy
+    items.sort(key=lambda x: x['precio'])
 
     mejor_solucion = None
     mejor_diferencia = float('inf')
 
-    # Intentar diferentes combinaciones usando backtracking optimizado
-    def backtrack(index, combinacion_actual, total_actual):
-        nonlocal mejor_solucion, mejor_diferencia
+    # Estrategia 1: Buscar desde productos baratos hacia caros
+    solucion = {}
+    total = 0.0
 
-        # Si el total está dentro del rango, verificar si es mejor solución
-        if monto_min_cents <= total_actual <= monto_max_cents:
-            diferencia = abs(total_actual - monto_objetivo_cents)
+    for item in items:
+        if total >= monto_max:
+            break
+
+        precio = item['precio']
+        cantidad_min = item['cantidad_min']
+        stock = item['stock']
+        producto = item['producto']
+
+        # Calcular cuántas unidades podemos agregar
+        espacio_restante = monto_max - total
+        max_unidades = min(int(espacio_restante / precio), stock)
+
+        if max_unidades >= cantidad_min:
+            # Agregar cantidad óptima
+            cantidad = max_unidades
+
+            # Ajustar para acercarse al objetivo
+            while cantidad >= cantidad_min:
+                nuevo_total = total + (precio * cantidad)
+                if monto_min <= nuevo_total <= monto_max:
+                    solucion[producto.id] = {'producto': producto, 'cantidad': cantidad}
+                    total = nuevo_total
+                    break
+                elif nuevo_total > monto_max:
+                    cantidad -= 1
+                else:
+                    break
+
+    # Verificar si encontramos una solución válida
+    if monto_min <= total <= monto_max:
+        diferencia = abs(total - monto_objetivo)
+        if diferencia < mejor_diferencia:
+            mejor_diferencia = diferencia
+            mejor_solucion = solucion
+
+    # Estrategia 2: Si no encontramos solución, intentar desde productos caros
+    if mejor_solucion is None:
+        items.reverse()  # Ordenar de caro a barato
+        solucion = {}
+        total = 0.0
+
+        for item in items:
+            if total >= monto_max:
+                break
+
+            precio = item['precio']
+            cantidad_min = item['cantidad_min']
+            stock = item['stock']
+            producto = item['producto']
+
+            espacio_restante = monto_max - total
+            max_unidades = min(int(espacio_restante / precio), stock)
+
+            if max_unidades >= cantidad_min:
+                cantidad = cantidad_min  # Empezar con el mínimo
+
+                while cantidad <= max_unidades:
+                    nuevo_total = total + (precio * cantidad)
+                    if monto_min <= nuevo_total <= monto_max:
+                        solucion[producto.id] = {'producto': producto, 'cantidad': cantidad}
+                        total = nuevo_total
+                        break
+                    elif nuevo_total < monto_min:
+                        cantidad += 1
+                    else:
+                        break
+
+        if monto_min <= total <= monto_max:
+            diferencia = abs(total - monto_objetivo)
             if diferencia < mejor_diferencia:
                 mejor_diferencia = diferencia
-                mejor_solucion = combinacion_actual.copy()
-
-        # Si ya superamos el máximo, no seguir explorando
-        if total_actual > monto_max_cents:
-            return
-
-        # Si ya revisamos todos los productos, retornar
-        if index >= len(productos):
-            return
-
-        producto = productos[index]
-        precio_cents = int(float(producto.precio_unitario) * 100)
-
-        # Determinar cantidad mínima - DEBE respetar restricción de despacho
-        if producto.tiene_despacho_minimo and producto.cantidad_minima_despacho:
-            cantidad_min = producto.cantidad_minima_despacho
-        else:
-            cantidad_min = 1
-
-        # Intentar diferentes cantidades de este producto
-        max_cantidad = min(producto.stock, (monto_max_cents - total_actual) // precio_cents + 5)
-
-        # Opción 1: No incluir este producto (solo si no hay restricción o si podemos seguir sin él)
-        backtrack(index + 1, combinacion_actual, total_actual)
-
-        # Opción 2: Incluir el producto respetando cantidad mínima de despacho
-        # Si tiene despacho mínimo, DEBE incluirse con al menos la cantidad mínima
-        for cantidad in range(cantidad_min, max_cantidad + 1):
-            nuevo_total = total_actual + (precio_cents * cantidad)
-            if nuevo_total <= monto_max_cents + (precio_cents * 2):  # Pequeño margen extra
-                nueva_combinacion = combinacion_actual.copy()
-                nueva_combinacion[producto.id] = {
-                    'producto': producto,
-                    'cantidad': cantidad
-                }
-                backtrack(index + 1, nueva_combinacion, nuevo_total)
-
-    # Iniciar búsqueda
-    backtrack(0, {}, 0)
+                mejor_solucion = solucion
 
     if mejor_solucion is None:
         return {
@@ -230,7 +298,8 @@ def eliminar_producto(producto_id):
 
 @app.route('/api/generar-boleta', methods=['POST'])
 def generar_boleta():
-    """Generar boleta basada en monto objetivo"""
+    """Generar boleta basada en monto objetivo y guardarla en BD"""
+    import json
     data = request.get_json()
 
     if not data.get('monto_objetivo'):
@@ -251,18 +320,42 @@ def generar_boleta():
         if monto_objetivo <= 0:
             return jsonify({'error': 'El monto debe ser mayor a 0'}), 400
 
+        # Generar boleta con algoritmo optimizado
         resultado = generar_boleta_optimizada(monto_objetivo, tolerancia)
 
-        # Agregar información del cliente a la boleta
+        # Agregar información del cliente
         resultado['nombre'] = data['nombre']
         resultado['dni'] = data['dni']
         resultado['lugar'] = data['lugar']
+
+        # Guardar en base de datos (solo si se generó correctamente)
+        if 'error' not in resultado and resultado['productos']:
+            nueva_boleta = Boleta(
+                nombre_cliente=data['nombre'],
+                dni_cliente=data['dni'],
+                lugar_cliente=data['lugar'],
+                monto_objetivo=monto_objetivo,
+                total=resultado['total'],
+                diferencia=resultado['diferencia'],
+                productos_json=json.dumps(resultado['productos'])
+            )
+            db.session.add(nueva_boleta)
+            db.session.commit()
+            resultado['boleta_id'] = nueva_boleta.id
 
         return jsonify(resultado)
     except ValueError:
         return jsonify({'error': 'Monto objetivo debe ser un número válido'}), 400
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/boletas', methods=['GET'])
+def obtener_boletas():
+    """Obtener historial de boletas generadas"""
+    boletas = Boleta.query.order_by(Boleta.created_at.desc()).limit(50).all()
+    return jsonify([b.to_dict() for b in boletas])
 
 
 if __name__ == '__main__':
