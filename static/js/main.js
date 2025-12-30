@@ -110,8 +110,17 @@ const app = {
     },
 
     async generarBoleta() {
+        const nombre = document.getElementById('nombre_cliente').value.trim();
+        const dni = document.getElementById('dni_cliente').value.trim();
+        const lugar = document.getElementById('lugar_cliente').value.trim();
         const monto_objetivo = parseFloat(document.getElementById('monto_objetivo').value);
         const tolerancia = parseFloat(document.getElementById('tolerancia').value) || 5;
+
+        // Validaciones
+        if (!nombre || !dni || !lugar) {
+            alert('Por favor complete todos los campos requeridos (Nombre, DNI, Lugar)');
+            return;
+        }
 
         if (!monto_objetivo || monto_objetivo <= 0) {
             alert('Por favor ingrese un monto objetivo válido');
@@ -124,7 +133,13 @@ const app = {
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ monto_objetivo, tolerancia })
+                body: JSON.stringify({
+                    nombre,
+                    dni,
+                    lugar,
+                    monto_objetivo,
+                    tolerancia
+                })
             });
 
             if (!response.ok) {
@@ -186,6 +201,11 @@ const app = {
 
         // Mostrar información de la boleta
         infoDiv.innerHTML = `
+            <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 2px solid #667eea;">
+                <p><strong>Nombre:</strong> ${boleta.nombre}</p>
+                <p><strong>DNI:</strong> ${boleta.dni}</p>
+                <p><strong>Lugar:</strong> ${boleta.lugar}</p>
+            </div>
             <p><strong>Monto Objetivo:</strong> $${boleta.monto_objetivo.toFixed(2)}</p>
             <p><strong>Diferencia:</strong> $${boleta.diferencia.toFixed(2)}</p>
             <p style="color: #48bb78;"><strong>Productos encontrados:</strong> ${boleta.productos.length}</p>

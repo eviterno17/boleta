@@ -88,18 +88,20 @@ def generar_boleta_optimizada(monto_objetivo, tolerancia=5):
         producto = productos[index]
         precio_cents = int(float(producto.precio_unitario) * 100)
 
-        # Determinar cantidad mínima
-        cantidad_min = producto.cantidad_minima_despacho if producto.tiene_despacho_minimo else 1
-        if cantidad_min is None:
+        # Determinar cantidad mínima - DEBE respetar restricción de despacho
+        if producto.tiene_despacho_minimo and producto.cantidad_minima_despacho:
+            cantidad_min = producto.cantidad_minima_despacho
+        else:
             cantidad_min = 1
 
         # Intentar diferentes cantidades de este producto
         max_cantidad = min(producto.stock, (monto_max_cents - total_actual) // precio_cents + 5)
 
-        # Opción 1: No incluir este producto
+        # Opción 1: No incluir este producto (solo si no hay restricción o si podemos seguir sin él)
         backtrack(index + 1, combinacion_actual, total_actual)
 
-        # Opción 2: Incluir el producto en diferentes cantidades
+        # Opción 2: Incluir el producto respetando cantidad mínima de despacho
+        # Si tiene despacho mínimo, DEBE incluirse con al menos la cantidad mínima
         for cantidad in range(cantidad_min, max_cantidad + 1):
             nuevo_total = total_actual + (precio_cents * cantidad)
             if nuevo_total <= monto_max_cents + (precio_cents * 2):  # Pequeño margen extra
@@ -234,6 +236,14 @@ def generar_boleta():
     if not data.get('monto_objetivo'):
         return jsonify({'error': 'Monto objetivo es requerido'}), 400
 
+    # Validar campos requeridos
+    if not data.get('nombre'):
+        return jsonify({'error': 'El nombre es requerido'}), 400
+    if not data.get('dni'):
+        return jsonify({'error': 'El DNI es requerido'}), 400
+    if not data.get('lugar'):
+        return jsonify({'error': 'El lugar es requerido'}), 400
+
     try:
         monto_objetivo = float(data['monto_objetivo'])
         tolerancia = float(data.get('tolerancia', 5))
@@ -242,6 +252,12 @@ def generar_boleta():
             return jsonify({'error': 'El monto debe ser mayor a 0'}), 400
 
         resultado = generar_boleta_optimizada(monto_objetivo, tolerancia)
+
+        # Agregar información del cliente a la boleta
+        resultado['nombre'] = data['nombre']
+        resultado['dni'] = data['dni']
+        resultado['lugar'] = data['lugar']
+
         return jsonify(resultado)
     except ValueError:
         return jsonify({'error': 'Monto objetivo debe ser un número válido'}), 400
